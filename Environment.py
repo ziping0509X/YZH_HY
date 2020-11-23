@@ -4,6 +4,7 @@ import time
 import random
 import math
 # This file is revised for more precise and concise expression.
+# 尝试使用github的在线修改和pull、push功能
 class V2Vchannels:              
     # Simulator of the V2V Channels
     def __init__(self, n_Veh, n_RB):
