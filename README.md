@@ -1,1 +1,2 @@
 # ResourceAllocationReinforcementLearning
+给源码添加了注释，为Version-1提供思路和指导。
