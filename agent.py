@@ -9,6 +9,8 @@ from utils import save_pkl, load_pkl
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
+#12月2号，大致上已经看完了代码的框架，添加了注释
+
 class Agent(BaseModel):
     def __init__(self, config, environment, sess):
         self.sess = sess
@@ -70,14 +72,14 @@ class Agent(BaseModel):
     def predict(self, s_t,  step, test_ep = False):
         # ==========================
         #  Select actions
-        # ======================
+        # ==========================
         ep = 1/(step/1000000 + 1)
         if random.random() < ep and test_ep == False:   # epsion to balance the exporation and exploition
             action = np.random.randint(60)
         else:          
             action =  self.q_action.eval({self.s_t:[s_t]})[0] 
         return action
-    def observe(self, prestate, state, reward, action):
+    def observe(self, prestate: object, state: object, reward: object, action: object) -> object:
         # -----------
         # Collect Data for Training 
         # ---------
@@ -92,17 +94,18 @@ class Agent(BaseModel):
                 #print("Update Target Q network:")
                 self.update_target_q_network()
 
-    def train(self):        
+    def train(self):
+        #12月2号，一直未能找到self.step自加1的源码位置
         num_game, self.update_count, ep_reward = 0, 0, 0.
         total_reward, self.total_loss, self.total_q = 0.,0.,0.
-        max_avg_ep_reward = 0
-        ep_reward, actions = [], []        
-        mean_big = 0
-        number_big = 0
-        mean_not_big = 0
-        number_not_big = 0
+        # max_avg_ep_reward = 0
+        # ep_reward, actions = [], []        
+        # mean_big = 0
+        # number_big = 0
+        # mean_not_big = 0
+        # number_not_big = 0
         self.env.new_random_game(20)
-        for self.step in (range(0, 40000)): # need more configuration
+        for self.step in (range(0, 40000)): # need more configuration  由于self.step是在这个大循环中用in range（0，N）来表达，所以循环结束以后，自动会加一！
             if self.step == 0:                   # initialize set some varibles
                 num_game, self.update_count,ep_reward = 0, 0, 0.
                 total_reward, self.total_loss, self.total_q = 0., 0., 0.
@@ -113,7 +116,7 @@ class Agent(BaseModel):
             if (self.step % 2000 == 1):
                 self.env.new_random_game(20)
             print(self.step)
-            state_old = self.get_state([0,0])
+            # state_old = self.get_state([0,0])
             #print("state", state_old)
             self.training = True
             for k in range(1):
@@ -125,8 +128,14 @@ class Agent(BaseModel):
                         self.action_all_with_power_training[i, j, 0] = action % self.RB_number
                         self.action_all_with_power_training[i, j, 1] = int(np.floor(action/self.RB_number))                                                    
                         reward_train = self.env.act_for_training(self.action_all_with_power_training, [i,j]) 
-                        state_new = self.get_state([i,j]) #这里get到的newstate居然和该用户选择的动作和通信功率没有关系？
+                        state_new = self.get_state([i,j])
+                        #这里get到的newstate居然和该用户选择的动作和通信功率没有关系？
                         self.observe(state_old, state_new, reward_train, action)
+
+
+
+
+
             if (self.step % 2000 == 0) and (self.step > 0): #暂时还没有看到self.step自加
                 # testing 
                 self.training = False
@@ -170,7 +179,7 @@ class Agent(BaseModel):
                   
                     
             
-    def q_learning_mini_batch(self):
+    def q_learning_mini_batch(self) -> object:
 
         # Training the DQN model
         # ------ 

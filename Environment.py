@@ -69,11 +69,14 @@ class V2Ichannels:
         self.h_bs = 25
         self.h_ms = 1.5        
         self.Decorrelation_distance = 50        
-        self.BS_position = [750/2, 1299/2]    # Suppose the BS is in the center
-        self.shadow_std = 8 #阴影衰落的标准差
+        self.BS_position = [750/2, 1299/2]
+        # Suppose the BS is in the center
+        self.shadow_std = 8
+        # 阴影衰落的标准差
         self.n_Veh = n_Veh
         self.n_RB = n_RB
-        self.update_shadow([]) #为什么这里要单独将shadow放出来？ 初始化，由于这里函数的输入是一个[]，因此是初始化了
+        self.update_shadow([])
+        #为什么这里要单独将shadow放出来？ 初始化，由于这里函数的输入是一个[]，因此是初始化了
     def update_positions(self, positions):
         self.positions = positions
         
@@ -85,8 +88,10 @@ class V2Ichannels:
             distance = math.hypot(d1,d2) # change from meters to kilometers
             self.PathLoss[i] = 128.1 + 37.6*np.log10(math.sqrt(distance**2 + (self.h_bs-self.h_ms)**2)/1000)
     def update_shadow(self, delta_distance_list):
-        if len(delta_distance_list) == 0:  # initialization 使用语句update_shadow([]),便可以对shadow做初始化
-            self.Shadow = np.random.normal(0, self.shadow_std, self.n_Veh)  #生成一个均值为0，标准差为std，维度（个数）为num_RB的正态分布数据  ？？？阴影衰落和什么因素有关系？
+        if len(delta_distance_list) == 0:
+            # initialization 使用语句update_shadow([]),便可以对shadow做初始化
+            self.Shadow = np.random.normal(0, self.shadow_std, self.n_Veh)
+            #生成一个均值为0，标准差为std，维度（个数）为num_RB的正态分布数据  ？？？阴影衰落和什么因素有关系？
         else: 
             delta_distance = np.asarray(delta_distance_list)
             self.Shadow = np.exp(-1*(delta_distance/self.Decorrelation_distance))* self.Shadow +\
@@ -285,7 +290,7 @@ class Environ:
         self.vehicles = []
         n_Veh = 20
         self.n_Veh = n_Veh
-        self.add_new_vehicles_by_number(int(self.n_Veh/4))
+        self.add_new_vehicles_by_number(int(self.n_Veh/4)) #为什么这里的输入是（self.n_Veh/4）
         step = 1000
         time_step = 0.1  # every 0.1s update
         for i in range(step):
@@ -509,41 +514,49 @@ class Environ:
         fail_percent = self.failed_transmission/(self.failed_transmission + self.success_transmission + 0.0001)            
         return V2I_Rate, fail_percent
 
-    def Compute_Performance_Reward_Batch(self, actions_power, idx):    # add the power dimension to the action selection  在动作选择中添加入功率维度
+    def Compute_Performance_Reward_Batch(self, actions_power, idx):#从头到尾，这个函数都只解决idx指示的这一对车辆用户
+        # add the power dimension to the action selection
+        # 在动作选择中添加入功率维度，由act_for_training调用
         # ==================================================
         # ------------- Used for Training ----------------
         # ==================================================
-        actions = actions_power.copy()[:,:,0]           # select RB
+        actions = actions_power.copy()[:,:,0]           # select RB 这里已经降维了
         power_selection = actions_power.copy()[:,:,1]   # select power
         V2V_Interference = np.zeros((len(self.vehicles), 3))
-        V2V_Signal = np.zeros((len(self.vehicles), 3))
+        V2V_Signal = np.zeros((len(self.vehicles), 3)) # V2V_interference中存储的是一个信号功率的折损值，在V2V_Rate中，才利用这个功率折损值去计算C
         Interfence_times = np.zeros((len(self.vehicles), 3))    #  3 neighbors
         #print(actions)
         origin_channel_selection = actions[idx[0], idx[1]]
-        actions[idx[0], idx[1]] = 100  # something not relavant
+        actions[idx[0], idx[1]] = 100  # something not relavant ？这里意思是不考虑自身的干扰了
         for i in range(self.n_RB):
-            indexes = np.argwhere(actions == i)  #返回符合括号内条件的数组下标
+            indexes = np.argwhere(actions == i)  #返回符合括号内条件的数组下标，只要是选择第i号信道的，都要参加下一个大循环
             #print('index',indexes)
-            for j in range(len(indexes)):
+            for j in range(len(indexes)): #因此上面的indexes是一个由多个元素的数组，？indexes是几维的？
                 #receiver_j = self.vehicles[indexes[j,0]].neighbors[indexes[j,1]]
                 receiver_j = self.vehicles[indexes[j,0]].destinations[indexes[j,1]]
                 V2V_Signal[indexes[j, 0],indexes[j, 1]] = 10**((self.V2V_power_dB_List[power_selection[indexes[j, 0],indexes[j, 1]]] -\
                 self.V2V_channels_with_fastfading[indexes[j,0], receiver_j, i]+ 2*self.vehAntGain - self.vehNoiseFigure)/10) 
-                V2V_Interference[indexes[j,0],indexes[j,1]] +=  10**((self.V2I_power_dB- self.V2V_channels_with_fastfading[i,receiver_j,i] + \
+                V2V_Interference[indexes[j,0],indexes[j,1]] +=  10**((self.V2I_power_dB- self.V2V_channels_wit
+
+
+                                                                      h_fastfading[i,receiver_j,i] + \
                 2*self.vehAntGain - self.vehNoiseFigure)/10)  # interference from the V2I links
                 
                 for k in range(j+1, len(indexes)):
                     receiver_k = self.vehicles[indexes[k,0]].destinations[indexes[k,1]]
                     V2V_Interference[indexes[j,0],indexes[j,1]] += 10**((self.V2V_power_dB_List[power_selection[indexes[k,0],indexes[k,1]]] - \
-                    self.V2V_channels_with_fastfading[indexes[k,0],receiver_j,i] + 2*self.vehAntGain - self.vehNoiseFigure)/10)
+                    self.V2V_channels_with_fastfading[indexes[k,0],receiver_j,i] + 2*self.vehAntGain - self.vehNoiseFigure)/10) #V2V链路的干扰
                     V2V_Interference[indexes[k,0],indexes[k,1]] += 10**((self.V2V_power_dB_List[power_selection[indexes[j,0],indexes[j,1]]] - \
                     self.V2V_channels_with_fastfading[indexes[j,0], receiver_k, i] + 2*self.vehAntGain - self.vehNoiseFigure)/10)
+                    # 由于干扰是双向的，因此这里写了两步，将两个链路的干扰都计算进去了
                     Interfence_times[indexes[j,0],indexes[j,1]] += 1
                     Interfence_times[indexes[k,0],indexes[k,1]] += 1
+
                     
-        self.V2V_Interference = V2V_Interference + self.sig2
+        self.V2V_Interference = V2V_Interference + self.sig2  #因此这个V2V_Interference综合考虑了B类用户公用的和A类用户公用的干扰
         V2V_Rate_list = np.zeros((self.n_RB, len(self.V2V_power_dB_List)))  # the number of RB times the power level
         Deficit_list = np.zeros((self.n_RB, len(self.V2V_power_dB_List)))
+        #在一个大的时隙中，由于分了很多个小的异步时隙来为单个用户分配动作，所以，要计算的是1号用户在这一整个大时隙中，所有的通信C
         for i in range(self.n_RB):
             indexes = np.argwhere(actions == i)
             V2V_Signal_temp = V2V_Signal.copy()            
@@ -561,12 +574,13 @@ class Environ:
                     self.V2V_channels_with_fastfading[indexes[j,0],receiver_k, i] + 2*self.vehAntGain - self.vehNoiseFigure)/10)
                     V2V_Interference_temp[indexes[j,0],indexes[j,1]] += 10**((self.V2V_power_dB_List[power_idx]-\
                     self.V2V_channels_with_fastfading[idx[0],receiver_j, i] + 2*self.vehAntGain - self.vehNoiseFigure)/10)
-                V2V_Rate_cur = np.log2(1 + np.divide(V2V_Signal_temp, V2V_Interference_temp))
+                V2V_Rate_cur = np.log2(1 + np.divide(V2V_Signal_temp, V2V_Interference_temp)) #在这里
                 if (origin_channel_selection == i) and (power_selection[idx[0], idx[1]] == power_idx):
                     V2V_Rate = V2V_Rate_cur.copy()
                 V2V_Rate_list[i, power_idx] = np.sum(V2V_Rate_cur)
-                Deficit_list[i,power_idx] = 0 - 1 * np.sum(np.maximum(np.zeros(V2V_Signal_temp.shape), (self.demand - self.individual_time_limit * V2V_Rate_cur * 1500)))
-        Interference = np.zeros(self.n_RB)  
+                Deficit_list[i,power_idx] = 0 - 1 * np.sum(np.maximum(np.zeros(V2V_Signal_temp.shape), (self.demand - self.individual_time_limit * V2V_Rate_cur * 1500)))  #V2V_signal最终落在了这里
+
+        Interference = np.zeros(self.n_RB)
         V2I_Rate_list = np.zeros((self.n_RB,len(self.V2V_power_dB_List)))    # 3 of power level
         for i in range(len(self.vehicles)):
             for j in range(len(actions[i,:])):
@@ -590,8 +604,9 @@ class Environ:
         if self.test_time_count == 0:
             self.test_time_count = 10
         return V2I_Rate_list, Deficit_list, self.individual_time_limit[idx[0], idx[1]]
+    # 返回的是V2I_rewardlist, V2V_rewardlist, time_left
 
-    def Compute_Interference(self, actions):
+    def Compute_Interference(self, actions): #由act_for_training调用
         # ====================================================
         # Compute the Interference to each channel_selection
         # ====================================================
@@ -622,24 +637,26 @@ class Environ:
         # generate a new demand of a V2V
         self.demand = self.demand_amount*np.ones((self.n_RB,3))
         self.time_limit = 10
-    def act_for_training(self, actions, idx):  # 主架构中获取奖励是从这里获取的
+    def act_for_training(self, actions, idx):  # 主架构中获取奖励是从这里获取的,训练部分的reward是从这个地方获得的
+        #由于是异步赋值的，所以这个函数中，action数组需要idx指引获取具体哪一部分
         # =============================================
         # This function gives rewards for training
         # ===========================================
-        rewards_list = np.zeros(self.n_RB)
+        # rewards_list = np.zeros(self.n_RB) #实际上并没有用到
         action_temp = actions.copy()
         self.activate_links = np.ones((self.n_Veh,3), dtype = 'bool')
-        V2I_rewardlist, V2V_rewardlist, time_left = self.Compute_Performance_Reward_Batch(action_temp,idx)
+        V2I_rewardlist, V2V_rewardlist, time_left = self.Compute_Performance_Reward_Batch(action_temp,idx)  #在这里调用Comput_Performance_Reward_Batch
         self.renew_positions()
         self.renew_channels_fastfading()
-        self.Compute_Interference(actions) 
-        rewards_list = rewards_list.T.reshape([-1])
+        self.Compute_Interference(actions)
+        #计算出干扰后，在此次step中没有见到再次调用这个self.Compute_Interference,猜测在下一个step会调用这个路径
+        # rewards_list = rewards_list.T.reshape([-1])
         V2I_rewardlist = V2I_rewardlist.T.reshape([-1])
         V2V_rewardlist = V2V_rewardlist.T.reshape([-1])
         V2I_reward = (V2I_rewardlist[actions[idx[0],idx[1], 0]+ 20*actions[idx[0],idx[1], 1]] -\
                       np.min(V2I_rewardlist))/(np.max(V2I_rewardlist) -np.min(V2I_rewardlist) + 0.000001)
         V2V_reward = (V2V_rewardlist[actions[idx[0],idx[1], 0]+ 20*actions[idx[0],idx[1], 1]] -\
-                     np.min(V2V_rewardlist))/(np.max(V2V_rewardlist) -np.min(V2V_rewardlist) + 0.000001)
+                     np.min(V2V_rewardlist))/(np.max(V2V_rewardlist) -np.min(V2V_rewardlist) + 0.000001) #没有看明白这里这如何计算reward的
         lambdda = 0.1
         #print ("Reward", V2I_reward, V2V_reward, time_left)
         t = lambdda * V2I_reward + (1-lambdda) * V2V_reward  #这里还没有把时间纳入到考虑之中
@@ -700,4 +717,4 @@ if __name__ == "__main__":
     width = 750
     height = 1299
     Env = Environ(down_lanes,up_lanes,left_lanes,right_lanes, width, height) 
-    Env.test_channel()    
+    Env.test_channel()     #在environment包中单独测试了一次这些信道是否可以正常被使用
